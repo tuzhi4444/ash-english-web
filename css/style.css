@@ -236,6 +236,9 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Ro
 .tab-item.active { color: #7a3fd4; }
 .tab-item:focus { outline: none; }
 
+/* === 通用隐藏 === */
+.hidden { display: none !important; }
+
 /* === Toast提示 === */
 .toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.75); color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 14px; z-index: 999; pointer-events: none; transition: opacity 0.3s; white-space: nowrap; }
 .toast.hidden { opacity: 0; }

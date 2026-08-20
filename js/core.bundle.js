@@ -1,6 +1,6 @@
 /* 自动生成，请勿手改 —— 由 build.js 从小程序工程打包。
    源：english-app-mp
-   生成时间：2026-08-20T10:22:33.400Z
+   生成时间：2026-08-20T11:01:13.626Z
    共 23 个模块 */
 (function (global) {
   var defs = {}, cache = {};
@@ -4454,6 +4454,7 @@ function completeTask(plan, level, key, amount, wordQuota) {
 __def("shared/utils/stats", function (module, exports, require) {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.MAX_DAILY_SECONDS = exports.MAX_SESSION_SECONDS = void 0;
 exports.formatDuration = formatDuration;
 exports.last7Days = last7Days;
 exports.totalLearned = totalLearned;
@@ -4462,6 +4463,7 @@ exports.listeningAccuracy = listeningAccuracy;
 exports.passageAccuracy = passageAccuracy;
 exports.totalPlayedLevels = totalPlayedLevels;
 exports.addStudyTime = addStudyTime;
+exports.sanitizeStats = sanitizeStats;
 const plan_1 = require("./plan");
 /** 秒 → "X小时Y分钟" */
 function formatDuration(seconds) {
@@ -4514,18 +4516,54 @@ function passageAccuracy(store) {
 function totalPlayedLevels(store) {
     return Object.keys(store.plan.levels).length;
 }
+/**
+ * 单次记账的上限（秒）。
+ *
+ * 原先只有下限（elapsed > 5）没有上限，而 startTime 只在 onLoad/onShow 重置——
+ * 手机锁屏、切走 App、微信在后台被杀，onHide 都可能不触发，startTime 就停在
+ * 几小时前，之后某次 onUnload 把这一大段一次性记进去。再叠加"时间记在记账
+ * 那一刻的日期"（addStudyTime 用 todayStr()），昨天挂着的幽灵时长全算到今天，
+ * 于是单日冒出 26 小时这种不可能的数。
+ *
+ * 现在计时改成心跳累加（见 store/index.startStudyTimer）：每 15 秒记那 15 秒，
+ * 中途被挂起时间隔会异常，直接丢弃。这个上限是第二道防线，兼容老的调用路径。
+ */
+exports.MAX_SESSION_SECONDS = 300;
+/** 单日上限：24 小时是物理边界，超过必然是 bug 产物 */
+exports.MAX_DAILY_SECONDS = 24 * 3600;
 /** 把一段学习时长累加进 stats */
 function addStudyTime(stats, seconds) {
     var _a;
+    const sec = Math.max(0, Math.min(Math.floor(seconds) || 0, exports.MAX_SESSION_SECONDS));
+    if (sec <= 0)
+        return stats;
     const key = (0, plan_1.todayStr)();
+    const cur = (_a = stats.dailyStudyTime[key]) !== null && _a !== void 0 ? _a : 0;
+    const next = Math.min(cur + sec, exports.MAX_DAILY_SECONDS);
     return {
         ...stats,
-        totalStudyTime: stats.totalStudyTime + seconds,
-        dailyStudyTime: {
-            ...stats.dailyStudyTime,
-            [key]: ((_a = stats.dailyStudyTime[key]) !== null && _a !== void 0 ? _a : 0) + seconds,
-        },
+        // 单日被截断时总时长也只加实际计入的那部分，两个数才对得上
+        totalStudyTime: stats.totalStudyTime + (next - cur),
+        dailyStudyTime: { ...stats.dailyStudyTime, [key]: next },
     };
+}
+/**
+ * 修复历史数据里不可能的时长。
+ *
+ * 老版本记出过单日 20+ 小时的值，这些是上面那个 bug 的产物、无法还原成真实值。
+ * 这里只做物理边界上的截断（单日 ≤ 24h），并把总时长压到不超过各日之和——
+ * 不去猜"合理值"替用户改数，超出物理可能的部分才动。
+ */
+function sanitizeStats(stats) {
+    const daily = {};
+    let sum = 0;
+    for (const [k, v] of Object.entries((stats && stats.dailyStudyTime) || {})) {
+        const s = Math.max(0, Math.min(Math.floor(v) || 0, exports.MAX_DAILY_SECONDS));
+        daily[k] = s;
+        sum += s;
+    }
+    const total = Math.max(0, Math.floor((stats && stats.totalStudyTime) || 0));
+    return { ...stats, dailyStudyTime: daily, totalStudyTime: Math.min(total, sum) };
 }
 
 });
@@ -4610,6 +4648,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.migrateStore = migrateStore;
 const store_1 = require("./store");
 const plan_1 = require("./plan");
+const stats_1 = require("./stats");
 /**
  * 布尔完成度转计数。旧数据只知道"做过"，不知道做了几个，
  * 所以 true 折算成一个大数（视为已达标），false 折算成 0——
@@ -4723,7 +4762,8 @@ function migrateStore(raw) {
         passage: { ...base.passage, ...((_a = raw.passage) !== null && _a !== void 0 ? _a : {}) },
         dialogue: { ...base.dialogue, ...((_b = raw.dialogue) !== null && _b !== void 0 ? _b : {}) },
         customPassages: (_c = raw.customPassages) !== null && _c !== void 0 ? _c : [],
-        stats: { ...base.stats, ...((_d = raw.stats) !== null && _d !== void 0 ? _d : {}) },
+        // 老版本的计时 bug 记出过单日 20+ 小时，这里截断到物理可能的范围
+        stats: (0, stats_1.sanitizeStats)({ ...base.stats, ...((_d = raw.stats) !== null && _d !== void 0 ? _d : {}) }),
         settings: migrateSettings(base.settings, (_e = raw.settings) !== null && _e !== void 0 ? _e : undefined),
         assessment: { ...base.assessment, ...((_f = raw.assessment) !== null && _f !== void 0 ? _f : {}) },
         plan: base.plan,
@@ -4815,6 +4855,8 @@ exports.createInitialStore = createInitialStore;
 exports.refreshStore = refreshStore;
 exports.completeLevelTask = completeLevelTask;
 exports.recordStudyTime = recordStudyTime;
+exports.startStudyTimer = startStudyTimer;
+exports.stopStudyTimer = stopStudyTimer;
 exports.updateWordRecord = updateWordRecord;
 exports.recordNewWordResult = recordNewWordResult;
 exports.recordTodayNew = recordTodayNew;
@@ -4954,6 +4996,45 @@ function recordStudyTime(seconds) {
         ...s,
         stats: (0, stats_1.addStudyTime)(s.stats, seconds),
     }));
+}
+/**
+ * 学习计时：心跳累加。
+ *
+ * 老做法是"进页面记 startTime、离开时把 now - startTime 一次性记进去"。
+ * 问题是 startTime 只在 onLoad/onShow 重置，而锁屏、切走 App、微信在后台
+ * 被杀，onHide 都可能不触发——startTime 停在几小时前，之后某次 onUnload
+ * 把这一大段全记进去，于是出现单日 26 小时这种不可能的数。
+ *
+ * 现在每 TICK 秒记一次那 TICK 秒。被挂起时定时器不走（或走得不准），
+ * 恢复后两次心跳的间隔会明显偏大，那一段直接丢弃不计。
+ * 这样漏掉任何生命周期回调，最多少记一个心跳，绝不会多记。
+ */
+const TICK_SECONDS = 15;
+let _tickTimer = null;
+let _lastTick = 0;
+function tickOnce() {
+    const now = Date.now();
+    const delta = Math.floor((now - _lastTick) / 1000);
+    _lastTick = now;
+    // 只认接近一个心跳的间隔；偏大说明中间被挂起过，那段不是学习时间
+    if (delta > 0 && delta <= TICK_SECONDS * 2)
+        recordStudyTime(delta);
+}
+/** 进入学习页面时调用 */
+function startStudyTimer() {
+    stopStudyTimer();
+    if (!hasStore())
+        return;
+    _lastTick = Date.now();
+    _tickTimer = setInterval(tickOnce, TICK_SECONDS * 1000);
+}
+/** 离开学习页面时调用；会补记最后不足一个心跳的零头 */
+function stopStudyTimer() {
+    if (_tickTimer) {
+        clearInterval(_tickTimer);
+        _tickTimer = null;
+        tickOnce();
+    }
 }
 /**
  * 起点自动校准。

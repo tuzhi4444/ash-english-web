@@ -58,22 +58,22 @@
     }).join('') + '</nav>';
   }
 
-  // 学习页面停留时长计入统计（对应小程序的 onHide/onUnload）
-  var enterAt = 0;
+  // 学习页面停留时长计入统计。
+  // 用 store 里的心跳计时器（和小程序端同一份实现）——
+  // 早先是"进页面记时间戳、离开时一次性记 now - enterAt"，
+  // 而手机上切走 App 时 visibilitychange/pagehide 未必可靠，
+  // 时间戳会停在几小时前，某次路由切换就把这一大段记进去，
+  // 于是出现单日 26 小时这种不可能的数。
   var TIMED = { words: 1, framework: 1, shadowing: 1, listening: 1, dialogue: 1, passage_detail: 1 };
-  function flushStudyTime(name) {
-    if (!TIMED[name] || !enterAt) return;
-    var sec = Math.floor((Date.now() - enterAt) / 1000);
-    if (sec > 5 && Store.hasStore()) Store.recordStudyTime(sec);
-    enterAt = 0;
-  }
+  function startTiming(name) { if (TIMED[name]) Store.startStudyTimer(); }
+  function flushStudyTime() { Store.stopStudyTimer(); }
 
   function route() {
     var r = parseHash();
     var view = views[r.name];
     if (!view) { go('home'); return; }
 
-    if (current) flushStudyTime(current);
+    flushStudyTime();
     P.stopSpeak();
 
     var app = document.getElementById('app');
@@ -98,14 +98,14 @@
     if (b) b.onclick = back;
 
     current = r.name;
-    enterAt = Date.now();
+    startTiming(r.name);
     window.scrollTo(0, 0);
   }
 
   window.addEventListener('hashchange', route);
-  window.addEventListener('pagehide', function () { flushStudyTime(current); });
+  window.addEventListener('pagehide', function () { flushStudyTime(); });
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden) flushStudyTime(current); else enterAt = Date.now();
+    if (document.hidden) flushStudyTime(); else startTiming(current);
   });
 
   // 轻量提示

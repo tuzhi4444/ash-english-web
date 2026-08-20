@@ -71,8 +71,8 @@
         kv('当前进度', '第 ' + st.plan.planDay + ' 关') +
         kv('入门至今', st.plan.calendarDay + ' 天') +
         kv('实际学习', studyDays + ' 天') +
-        kv('学过的词', learned + ' 词') +
-        kv('已巩固', retained + ' 词') +
+        kvLink('学过的词', learned + ' 词', '已学') +
+        kvLink('已巩固', retained + ' 词', '已巩固') +
         kv('已毕业', mastered + ' 词') +
         kv('总时长', Stats.formatDuration(st.stats.totalStudyTime)) + '</div>';
 
@@ -105,6 +105,11 @@
     }
   });
   function kv(k, v) { return '<div class="kv"><span>' + k + '</span><b>' + v + '</b></div>'; }
+  /** 可点击的统计行 —— 点进词库看具体是哪些词 */
+  function kvLink(k, v, status) {
+    return '<a class="kv tappable" href="#/browser?status=' + encodeURIComponent(status) + '">' +
+      '<span>' + k + ' ›</span><b>' + v + '</b></a>';
+  }
 
   // ========================= 我的（设置） =========================
   A.register('settings', {
@@ -274,35 +279,82 @@
   });
 
   // ========================= 词库浏览 =========================
+  // 状态口径与统计页、小程序端一致（见 pages/browser/browser.js 的 STATUS_OPTIONS）
+  var STATUS_OPTIONS = ['全部', '新词', '已学', '学习中', '已巩固', '已毕业'];
+
+  /** 学过的词显示"第几级 · 下次复习" */
+  function stageDetail(r, calendarDay) {
+    if (r.mastered) return '已走完全部 ' + Srs.MAX_STAGE + ' 级，不再出现';
+    var parts = ['第 ' + (r.stage || 0) + ' / ' + Srs.MAX_STAGE + ' 级'];
+    if (r.due !== null && r.due !== undefined) {
+      var d = r.due - calendarDay;
+      parts.push(d <= 0 ? '待复习' : d + ' 天后复习');
+    }
+    if (r.lapses) parts.push('错过 ' + r.lapses + ' 次');
+    return parts.join(' · ');
+  }
+
   A.register('browser', {
     title: '词库',
     render: function () {
-      return '<div class="card"><input class="input" id="q" placeholder="搜索单词或中文释义"></div>' +
+      return '<div class="card"><input class="input" id="q" placeholder="搜索单词或中文释义">' +
+        '<div class="chips" id="chips">' + STATUS_OPTIONS.map(function (s) {
+          return '<button class="chip-btn" data-s="' + esc(s) + '">' + esc(s) + '</button>';
+        }).join('') + '</div></div>' +
         '<div id="list"></div>';
     },
-    mount: function (root) {
-      var st = S.getStore() || { words: {} };
+    mount: function (root, params) {
+      var st = S.getStore() || { words: {}, plan: { calendarDay: 0 } };
       var listEl = root.querySelector('#list');
-      function draw(kw) {
-        kw = (kw || '').trim().toLowerCase();
-        var arr = WORDS;
-        if (kw) arr = WORDS.filter(function (w) {
-          return w.en.toLowerCase().indexOf(kw) >= 0 || w.zh.indexOf(kw) >= 0;
-        });
-        var show = arr.slice(0, 200);
-        listEl.innerHTML = '<div class="card list">' + show.map(function (w) {
-          var r = st.words[w.en.toLowerCase()];
-          var tag = !r || !r.seen ? '<span class="tag new">新词</span>'
-            : (r.mastered ? '<span class="tag ok">已毕业</span>'
-            : (Plan.isRetained(r) ? '<span class="tag ok">已巩固</span>' : '<span class="tag">学习中</span>'));
-          return '<div class="row static"><span class="row-main">' +
-            '<span class="row-title">' + esc(w.en) + ' <span class="hint">' + esc(w.pos) + '</span></span>' +
-            '<span class="hint">' + esc(w.zh) + '</span></span>' + tag + '</div>';
-        }).join('') + '</div>' +
-        (arr.length > show.length ? '<p class="hint center">仅显示前 200 条，共 ' + arr.length + ' 条</p>' : '');
+      // 统计页的「已学 / 已巩固」点进来时带 ?status=…
+      var status = STATUS_OPTIONS.indexOf(params.status) >= 0 ? params.status : '全部';
+      var kw = '';
+      var LIMIT = 200;
+
+      function matches(w) {
+        var r = st.words[w.en.toLowerCase()];
+        if (status === '全部') return true;
+        if (status === '新词') return !r || !r.seen;
+        if (!r || !r.seen) return false;
+        if (status === '已学') return !r.testSkipped;
+        if (status === '学习中') return !Plan.isRetained(r);
+        if (status === '已巩固') return Plan.isRetained(r);
+        if (status === '已毕业') return !!r.mastered;
+        return true;
       }
-      root.querySelector('#q').oninput = function () { draw(this.value); };
-      draw('');
+
+      function draw() {
+        root.querySelectorAll('.chip-btn').forEach(function (b) {
+          b.classList.toggle('active', b.dataset.s === status);
+        });
+        var q = kw.trim().toLowerCase();
+        var arr = WORDS.filter(function (w) {
+          if (q && w.en.toLowerCase().indexOf(q) < 0 && w.zh.indexOf(q) < 0) return false;
+          return matches(w);
+        });
+        var show = arr.slice(0, LIMIT);
+        listEl.innerHTML = '<p class="hint center">共 ' + arr.length + ' 个词' +
+          (arr.length > LIMIT ? '，显示前 ' + LIMIT + ' 个' : '') + '</p>' +
+          (show.length ? '<div class="card list">' + show.map(function (w) {
+            var r = st.words[w.en.toLowerCase()] || {};
+            var seen = !!r.seen;
+            var retained = seen && Plan.isRetained(r);
+            var cls = !seen ? 'new' : (r.mastered ? 'ok' : (retained ? '' : 'warn'));
+            var label = !seen ? '新词' : (r.mastered ? '已毕业' : (retained ? '已巩固' : '学习中'));
+            return '<div class="row static"><span class="row-main">' +
+              '<span class="row-title">' + esc(w.en) + ' <span class="hint">' + esc(w.pos) + '</span></span>' +
+              '<span class="hint">' + esc(w.zh) + '</span>' +
+              (seen ? '<span class="hint">' + esc(stageDetail(r, st.plan.calendarDay)) + '</span>' : '') +
+              '</span><span class="tag ' + cls + '">' + label + '</span></div>';
+          }).join('') + '</div>'
+          : '<div class="card center"><p class="hint">没有匹配的单词</p></div>');
+      }
+
+      root.querySelector('#q').oninput = function () { kw = this.value; draw(); };
+      root.querySelectorAll('.chip-btn').forEach(function (b) {
+        b.onclick = function () { status = b.dataset.s; draw(); };
+      });
+      draw();
     }
   });
 })();

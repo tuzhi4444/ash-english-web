@@ -198,3 +198,14 @@ b{color:var(--primary)}
 .chart-detail{display:flex;justify-content:space-between;align-items:baseline;
   margin-top:12px;padding:10px 14px;background:var(--bg-page);border-radius:12px}
 .chart-detail b{font-size:19px}
+
+/* 状态筛选 chips */
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chip-btn{padding:6px 14px;border:1.5px solid var(--border);border-radius:99px;
+  background:var(--bg-card);color:var(--text-2);font-size:13px;cursor:pointer;font-family:inherit}
+.chip-btn.active{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
+.tag.warn{color:var(--warning);background:rgba(250,173,20,.15)}
+/* 可点击的统计行 */
+.kv.tappable{text-decoration:none;color:inherit}
+.kv.tappable:active{opacity:.6}
+.kv.tappable span{color:var(--primary)}

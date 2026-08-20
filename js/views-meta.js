@@ -35,10 +35,28 @@
         var cleared = st.plan.cleared.indexOf(n) >= 0;
         var cur = n === st.plan.planDay;
         var cls = cleared ? 'cleared' : (cur ? 'current' : (n < st.plan.planDay ? 'cleared' : 'locked'));
-        h += '<div class="lv ' + cls + '">' + n + '</div>';
+        h += '<div class="lv ' + cls + '" data-n="' + n + '">' + n + '</div>';
       }
-      h += '</div><p class="hint">「第 N 关」是通关数，不是天数——请假不会推进关卡。</p>';
+      h += '</div><p class="hint">「第 N 关」是通关数，不是天数——请假不会推进关卡。'
+        + '点已通关的关卡可以回刷（本次会话内有效，重开 app 会回到当前关）。</p>';
       return h;
+    },
+    mount: function (root) {
+      var st = S.getStore();
+      if (!st) return;
+      root.querySelectorAll('.lv').forEach(function (el) {
+        var n = +el.dataset.n;
+        if (n > st.plan.planDay) return;          // 未解锁的不给点
+        el.style.cursor = 'pointer';
+        el.onclick = function () {
+          if (n === st.plan.activeLevel) { A.go('home'); return; }
+          S.updateStore(function (s) {
+            return Object.assign({}, s, { plan: Object.assign({}, s.plan, { activeLevel: n }) });
+          });
+          A.toast('已切到第 ' + n + ' 关');
+          A.go('home');
+        };
+      });
     }
   });
 
@@ -135,8 +153,10 @@
         '</div>' +
         '<div class="card"><h3>数据</h3>' +
         '<button class="btn ghost block" id="exp">导出存档</button>' +
-        '<button class="btn ghost block" id="imp">导入存档</button>' +
+        '<button class="btn ghost block" id="imp">从文件导入</button>' +
+        '<button class="btn ghost block" id="impclip">从剪贴板导入</button>' +
         '<input type="file" id="file" accept=".json" hidden>' +
+        '<button class="btn ghost block" id="rsttime">重置学习时长</button>' +
         '<button class="btn danger block" id="reset">清除全部进度</button></div>' +
         '<p class="hint center">数据保存在这台设备的浏览器里。换设备或清缓存前记得导出。</p>';
     },
@@ -180,6 +200,28 @@
         };
         fr.readAsText(f);
       };
+      var impclip = root.querySelector('#impclip');
+      if (impclip) impclip.onclick = function () {
+        if (!navigator.clipboard || !navigator.clipboard.readText) {
+          A.toast('浏览器不支持读剪贴板，请用文件导入'); return;
+        }
+        navigator.clipboard.readText().then(function (txt) {
+          try {
+            S.setStore(core('shared/utils/migrate').migrateStore(JSON.parse(txt)));
+            A.toast('导入成功'); A.go('home');
+          } catch (e) { A.toast('剪贴板内容不是有效存档'); }
+        }).catch(function () { A.toast('读取剪贴板失败'); });
+      };
+      // 计时曾经有 bug 记出过离谱的时长，单独给一个只清时长的入口
+      var rt = root.querySelector('#rsttime');
+      if (rt) rt.onclick = function () {
+        if (!confirm('将学习总时长和每日时长清零，其他学习进度不受影响。确定继续吗？')) return;
+        S.updateStore(function (s) {
+          return Object.assign({}, s, { stats: Object.assign({}, s.stats,
+            { totalStudyTime: 0, dailyStudyTime: {} }) });
+        });
+        A.toast('已重置'); A.route();
+      };
       var rst = root.querySelector('#reset');
       if (rst) rst.onclick = function () {
         if (!confirm('将删除所有学习进度、统计和设置，此操作不可撤销。确定继续吗？')) return;
@@ -200,16 +242,40 @@
     title: '短文听力',
     render: function () {
       if (!S.hasStore()) return needStore('短文听力');
+      var cur = S.getStore().plan.currentPhase;
+      var chips = '<div class="chips">';
+      for (var p = 1; p <= cur; p++)
+        chips += '<button class="chip-btn' + (p === cur ? ' active' : '') + '" data-p="' + p + '">Phase ' + p + '</button>';
+      chips += '<button class="chip-btn" data-p="0">我导入的</button></div>';
+      return '<div class="card">' + chips + '</div><div id="list"></div>';
+    },
+    mount: function (root) {
       var st = S.getStore();
-      var list = Passages.getUnlockedPassages(st.plan.currentPhase);
-      var doneIds = st.passage.completed;
-      return '<div class="card list">' + list.map(function (p) {
-        var d = doneIds.indexOf(p.id) >= 0;
-        return '<a class="row" href="#/passage_detail?id=' + encodeURIComponent(p.id) + '">' +
-          '<span class="row-icon">' + (d ? '✅' : '📖') + '</span>' +
-          '<span class="row-main"><span class="row-title">' + esc(p.title) + '</span>' +
-          '<span class="hint">' + p.questions.length + ' 题</span></span><span class="arrow">›</span></a>';
-      }).join('') + '</div>';
+      if (!st) return;
+      function draw(p) {
+        root.querySelectorAll('.chip-btn').forEach(function (b) {
+          b.classList.toggle('active', +b.dataset.p === p);
+        });
+        var list = p === 0 ? (st.customPassages || [])
+          : Passages.PASSAGES.filter(function (x) { return x.phase === p; });
+        var doneIds = st.passage.completed;
+        root.querySelector('#list').innerHTML = list.length
+          ? '<div class="card list">' + list.map(function (x) {
+              var d = doneIds.indexOf(x.id) >= 0;
+              return '<a class="row" href="#/passage_detail?id=' + encodeURIComponent(x.id) + '">' +
+                '<span class="row-icon">' + (d ? '✅' : '📖') + '</span>' +
+                '<span class="row-main"><span class="row-title">' + esc(x.title) + '</span>' +
+                '<span class="hint">' + (x.questions ? x.questions.length : 0) + ' 题</span></span>' +
+                '<span class="arrow">›</span></a>';
+            }).join('') + '</div>'
+          : '<div class="card center"><p class="hint">' +
+            (p === 0 ? '还没有导入的材料，可以在「词库 → 我的材料」里粘贴一段英文生成。' : '这个阶段暂无短文。') +
+            '</p></div>';
+      }
+      root.querySelectorAll('.chip-btn').forEach(function (b) {
+        b.onclick = function () { draw(+b.dataset.p); };
+      });
+      draw(st.plan.currentPhase);
     }
   });
 
@@ -294,24 +360,41 @@
     return parts.join(' · ');
   }
 
+  var POS_OPTIONS = ['全部', 'n.', 'v.', 'adj.', 'adv.', 'prep.', 'conj.', '其他'];
+  var CORE_POS = ['n.', 'v.', 'adj.', 'adv.', 'prep.', 'conj.'];
+
   A.register('browser', {
     title: '词库',
     render: function () {
-      return '<div class="card"><input class="input" id="q" placeholder="搜索单词或中文释义">' +
-        '<div class="chips" id="chips">' + STATUS_OPTIONS.map(function (s) {
-          return '<button class="chip-btn" data-s="' + esc(s) + '">' + esc(s) + '</button>';
-        }).join('') + '</div></div>' +
-        '<div id="list"></div>';
+      return '<div class="tabs2"><button class="tab2 active" data-t="words">词库</button>' +
+        '<button class="tab2" data-t="materials">我的材料</button></div>' +
+        '<div id="pane"></div>';
     },
     mount: function (root, params) {
-      var st = S.getStore() || { words: {}, plan: { calendarDay: 0 } };
-      var listEl = root.querySelector('#list');
-      // 统计页的「已学 / 已巩固」点进来时带 ?status=…
+      var paneEl = root.querySelector('#pane');
+      var tab = 'words';
       var status = STATUS_OPTIONS.indexOf(params.status) >= 0 ? params.status : '全部';
-      var kw = '';
+      var pos = '全部', letter = '全部', kw = '';
       var LIMIT = 200;
 
-      function matches(w) {
+      var letters = ['全部'];
+      var seenL = {};
+      WORDS.forEach(function (w) {
+        var c = w.en.charAt(0).toUpperCase();
+        if (!seenL[c]) { seenL[c] = 1; letters.push(c); }
+      });
+      letters = [letters[0]].concat(letters.slice(1).sort());
+
+      root.querySelectorAll('.tab2').forEach(function (b) {
+        b.onclick = function () {
+          tab = b.dataset.t;
+          root.querySelectorAll('.tab2').forEach(function (x) { x.classList.toggle('active', x === b); });
+          tab === 'words' ? drawWords() : drawMaterials();
+        };
+      });
+
+      // ---------- 词库 ----------
+      function matches(w, st) {
         var r = st.words[w.en.toLowerCase()];
         if (status === '全部') return true;
         if (status === '新词') return !r || !r.seen;
@@ -323,38 +406,150 @@
         return true;
       }
 
-      function draw() {
-        root.querySelectorAll('.chip-btn').forEach(function (b) {
-          b.classList.toggle('active', b.dataset.s === status);
-        });
+      function drawWords() {
+        var st = S.getStore() || { words: {}, plan: { calendarDay: 0 } };
         var q = kw.trim().toLowerCase();
         var arr = WORDS.filter(function (w) {
           if (q && w.en.toLowerCase().indexOf(q) < 0 && w.zh.indexOf(q) < 0) return false;
-          return matches(w);
+          if (pos === '其他') { if (CORE_POS.indexOf(w.pos) >= 0) return false; }
+          else if (pos !== '全部' && w.pos !== pos) return false;
+          if (letter !== '全部' && w.en.charAt(0).toUpperCase() !== letter) return false;
+          return matches(w, st);
         });
         var show = arr.slice(0, LIMIT);
-        listEl.innerHTML = '<p class="hint center">共 ' + arr.length + ' 个词' +
-          (arr.length > LIMIT ? '，显示前 ' + LIMIT + ' 个' : '') + '</p>' +
+        paneEl.innerHTML =
+          '<div class="card"><input class="input" id="q" placeholder="搜索单词或中文释义" value="' + esc(kw) + '">' +
+          chipRow('s', STATUS_OPTIONS, status) +
+          chipRow('p', POS_OPTIONS, pos) +
+          chipRow('l', letters, letter) + '</div>' +
+          '<p class="hint center">共 ' + arr.length + ' 个词' + (arr.length > LIMIT ? '，显示前 ' + LIMIT + ' 个' : '') + '</p>' +
           (show.length ? '<div class="card list">' + show.map(function (w) {
             var r = st.words[w.en.toLowerCase()] || {};
             var seen = !!r.seen;
             var retained = seen && Plan.isRetained(r);
             var cls = !seen ? 'new' : (r.mastered ? 'ok' : (retained ? '' : 'warn'));
             var label = !seen ? '新词' : (r.mastered ? '已毕业' : (retained ? '已巩固' : '学习中'));
-            return '<div class="row static"><span class="row-main">' +
-              '<span class="row-title">' + esc(w.en) + ' <span class="hint">' + esc(w.pos) + '</span></span>' +
+            return '<div class="row"><span class="row-main wordcell" data-en="' + esc(w.en) + '">' +
+              '<span class="row-title">' + esc(w.en) + ' <span class="hint">' + esc(w.pos) + '</span> 🔊</span>' +
               '<span class="hint">' + esc(w.zh) + '</span>' +
               (seen ? '<span class="hint">' + esc(stageDetail(r, st.plan.calendarDay)) + '</span>' : '') +
-              '</span><span class="tag ' + cls + '">' + label + '</span></div>';
+              '</span>' +
+              '<span class="tag ' + cls + '">' + label + '</span>' +
+              '<span class="wactions">' +
+              '<span class="wact' + (r.favorite ? ' on' : '') + '" data-fav="' + esc(w.en) + '">' + (r.favorite ? '⭐' : '☆') + '</span>' +
+              '<span class="wact' + (r.markedDifficult ? ' on' : '') + '" data-hard="' + esc(w.en) + '">' + (r.markedDifficult ? '⚠️' : '△') + '</span>' +
+              '</span></div>';
           }).join('') + '</div>'
           : '<div class="card center"><p class="hint">没有匹配的单词</p></div>');
+
+        paneEl.querySelector('#q').oninput = function () { kw = this.value; drawWords(); };
+        paneEl.querySelectorAll('[data-chip]').forEach(function (b) {
+          b.onclick = function () {
+            var g = b.dataset.chip, v = b.dataset.v;
+            if (g === 's') status = v; else if (g === 'p') pos = v; else letter = v;
+            drawWords();
+          };
+        });
+        paneEl.querySelectorAll('.wordcell').forEach(function (el) {
+          el.onclick = function () { A.platform.speak(el.dataset.en, S.getSettings().speechRate); };
+        });
+        paneEl.querySelectorAll('[data-fav]').forEach(function (el) {
+          el.onclick = function (e) { e.stopPropagation(); toggle(el.dataset.fav, 'favorite'); };
+        });
+        paneEl.querySelectorAll('[data-hard]').forEach(function (el) {
+          el.onclick = function (e) { e.stopPropagation(); toggle(el.dataset.hard, 'markedDifficult'); };
+        });
       }
 
-      root.querySelector('#q').oninput = function () { kw = this.value; draw(); };
-      root.querySelectorAll('.chip-btn').forEach(function (b) {
-        b.onclick = function () { status = b.dataset.s; draw(); };
-      });
-      draw();
+      function chipRow(group, list, cur) {
+        return '<div class="chips">' + list.map(function (x) {
+          return '<button class="chip-btn' + (x === cur ? ' active' : '') +
+            '" data-chip="' + group + '" data-v="' + esc(x) + '">' + esc(x) + '</button>';
+        }).join('') + '</div>';
+      }
+
+      function toggle(en, field) {
+        var key = en.toLowerCase();
+        S.updateStore(function (s) {
+          var r = s.words[key] || core('shared/utils/srs').emptyRecord();
+          var nr = Object.assign({}, r); nr[field] = !r[field];
+          var w = Object.assign({}, s.words); w[key] = nr;
+          return Object.assign({}, s, { words: w });
+        });
+        drawWords();
+      }
+
+      // ---------- 我的材料 ----------
+      function drawMaterials() {
+        var st = S.getStore();
+        var list = (st && st.customPassages) || [];
+        paneEl.innerHTML = '<div class="card">' +
+          '<h3>粘贴一段英文，生成听力材料</h3>' +
+          '<p class="hint">每行一句，至少 2 句。会自动生成几道挖词题。</p>' +
+          '<input class="input" id="ti" placeholder="标题（可留空）">' +
+          '<textarea class="input ta" id="tx" rows="6" placeholder="每行一句英文…"></textarea>' +
+          '<button class="btn primary block" id="imp">生成材料</button></div>' +
+          (list.length ? '<div class="card list">' + list.map(function (p) {
+            return '<div class="row"><span class="row-icon">📄</span>' +
+              '<a class="row-main" href="#/passage_detail?id=' + encodeURIComponent(p.id) + '">' +
+              '<span class="row-title">' + esc(p.title) + '</span>' +
+              '<span class="hint">' + p.lines.length + ' 句 · ' + p.questions.length + ' 题</span></a>' +
+              '<span class="wact" data-del="' + esc(p.id) + '">🗑</span></div>';
+          }).join('') + '</div>'
+          : '<div class="card center"><p class="hint">还没有导入的材料</p></div>');
+
+        paneEl.querySelector('#imp').onclick = doImport;
+        paneEl.querySelectorAll('[data-del]').forEach(function (el) {
+          el.onclick = function () {
+            if (!confirm('删除这份材料？')) return;
+            S.updateStore(function (s) {
+              return Object.assign({}, s, { customPassages: s.customPassages.filter(function (x) {
+                return x.id !== el.dataset.del; }) });
+            });
+            drawMaterials();
+          };
+        });
+      }
+
+      /** 和小程序端 generateQuestions 同一套规则：挑长词挖空，同文取干扰项 */
+      function genQuestions(lines) {
+        var qs = [];
+        for (var i = 0; i < Math.min(3, lines.length); i++) {
+          var words = lines[i].split(/\s+/).filter(function (w) { return w.length > 3; });
+          if (words.length < 4) continue;
+          var target = words[Math.floor(Math.random() * words.length)].replace(/[.,!?;:"']/g, '');
+          if (target.length < 3) continue;
+          var pool = [];
+          lines.join(' ').split(/\s+/).forEach(function (w) {
+            w = w.replace(/[.,!?;:"']/g, '');
+            if (w.length > 3 && w !== target && pool.indexOf(w) < 0) pool.push(w);
+          });
+          if (pool.length < 3) continue;
+          var opts = A.shuffle([target].concat(A.shuffle(pool).slice(0, 3)));
+          qs.push({ q: '第 ' + (i + 1) + ' 句里出现了哪个词？', options: opts, answer: opts.indexOf(target) });
+        }
+        return qs;
+      }
+
+      function doImport() {
+        var text = paneEl.querySelector('#tx').value.trim();
+        var title = paneEl.querySelector('#ti').value.trim();
+        var lines = text.split(/\n+/).map(function (l) { return l.trim(); }).filter(Boolean);
+        if (lines.length < 2) { A.toast('至少需要 2 句'); return; }
+        var p = {
+          id: 'custom_' + Date.now(), phase: 1, title: title || '自定义材料',
+          lines: lines, linesZh: lines.map(function () { return ''; }),
+          text: lines.join(' '), questions: genQuestions(lines), source: 'imported'
+        };
+        S.updateStore(function (s) {
+          return Object.assign({}, s, { customPassages: (s.customPassages || []).concat([p]) });
+        });
+        A.toast('导入成功');
+        drawMaterials();
+      }
+
+      drawWords();
     }
   });
+
 })();

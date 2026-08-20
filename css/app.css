@@ -209,3 +209,33 @@ b{color:var(--primary)}
 .kv.tappable{text-decoration:none;color:inherit}
 .kv.tappable:active{opacity:.6}
 .kv.tappable span{color:var(--primary)}
+
+/* ===== 与小程序版对齐补的界面元素 ===== */
+/* 词库/材料 双 tab */
+.tabs2{display:flex;gap:8px;margin-bottom:14px}
+.tab2{flex:1;padding:10px;border:0;border-radius:12px;background:var(--bg-card);
+  color:var(--text-2);font-size:15px;cursor:pointer;font-family:inherit;box-shadow:var(--shadow)}
+.tab2.active{background:var(--primary);color:#fff}
+/* 词条上的收藏 / 难词按钮 */
+.wactions{display:flex;flex-direction:column;gap:6px;padding-left:6px}
+.wact{font-size:19px;cursor:pointer;opacity:.45;line-height:1.1}
+.wact.on{opacity:1}
+.wordcell{cursor:pointer}
+/* 多行输入 */
+.ta{min-height:120px;resize:vertical;line-height:1.6}
+/* 对话进度点 */
+.dots{display:flex;gap:5px;margin:10px 0;flex-wrap:wrap}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--border)}
+.dot.you{border:1.5px solid var(--primary);background:transparent}
+.dot.done{background:var(--success)}
+.dot.cur{background:var(--primary);transform:scale(1.35)}
+/* 跟读的词级对比 */
+.diffline{margin:8px 0;line-height:2}
+.dw{padding:2px 7px;border-radius:6px;font-size:15px}
+.dw.hit{background:var(--success-light);color:var(--success)}
+.dw.miss{background:var(--danger-light);color:var(--danger)}
+/* 对方台词遮罩（Phase 3 先听后看） */
+.masked{color:var(--text-3);font-size:15px;cursor:pointer}
+/* 用法详解 */
+.notebody{text-align:left;margin-top:10px}
+.sense{padding:8px 0;border-top:1px solid var(--border)}

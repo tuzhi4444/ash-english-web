@@ -90,6 +90,11 @@
         '<a class="row" href="#/passage"><span class="row-icon">📖</span>' +
         '<span class="row-main"><span class="row-title">短文听力</span></span>' +
         '<span class="hint">' + st.passage.completed.length + '/' + ps.length + '</span><span class="arrow">›</span></a>' +
+        '<a class="row" href="#/dialogue_list"><span class="row-icon">💬</span>' +
+        '<span class="row-main"><span class="row-title">对话场景库</span></span>' +
+        '<span class="hint">' + (st.dialogue.practiced || []).length + '/' +
+        core('shared/data/dialogues/index').getUnlockedDialogues(st.plan.currentPhase).length +
+        '</span><span class="arrow">›</span></a>' +
         '<a class="row" href="#/browser"><span class="row-icon">🔍</span>' +
         '<span class="row-main"><span class="row-title">词库浏览</span></span><span class="arrow">›</span></a>' +
         '</div>';
@@ -249,6 +254,7 @@
       var st = S.getStore();
       var queue = [], i = 0, step = 0, modes = [], maxMiss = 0, misses = 0;
       var done = 0, total = 0, correctCount = 0, recheckLeft = {}, isReviewWord = false;
+      var score = 0, combo = 0;
 
       function init() {
         if (free) {
@@ -300,7 +306,8 @@
         var mode = modes[step];
         var pct = total > 0 ? Math.min(100, Math.round(done / total * 100)) : 0;
         var h = '<div class="progress"><span class="hint">' + done + ' / ' + total +
-          '</span><span class="hint">剩余 ' + (queue.length - i) + '</span>' +
+          '</span><span class="hint">剩余 ' + (queue.length - i) +
+          (free ? '' : '　得分 ' + score + '　连击 ' + combo) + '</span>' +
           '<div class="bar"><i style="width:' + pct + '%"></i></div></div>' +
           '<div class="steps">' + modes.map(function (m, k) {
             return '<span class="stepchip' + (k === step ? ' active' : (k < step ? ' done' : '')) + '">' +
@@ -349,7 +356,20 @@
             card.dataset.f = '1';
             var note = UsageNotes.getUsageNote(w.en);
             box.querySelector('#rev').innerHTML = '<div class="word-en">' + esc(w.en) + '</div>' +
-              (note ? '<div class="note">' + esc(note.core) + '</div>' : '');
+              (note ? '<div class="note">核心：' + esc(note.core) + '</div>' +
+                (note.senses && note.senses.length
+                  ? '<button class="btn ghost" id="nt">📖 用法详解（' + note.senses.length + ' 种用法）</button>' +
+                    '<div id="ntb" hidden class="notebody">' + note.senses.map(function (x) {
+                      return '<div class="sense"><b>' + esc(x.use) + '</b>' +
+                        '<div>' + esc(x.en) + '</div><div class="hint">' + esc(x.zh) + '</div></div>';
+                    }).join('') + '</div>'
+                  : '')
+              : '');
+            var nt = box.querySelector('#nt');
+            if (nt) nt.onclick = function (ev) {
+              ev.stopPropagation();
+              var b = box.querySelector('#ntb'); b.hidden = !b.hidden;
+            };
             box.querySelector('#tip').remove();
             var fa = box.querySelector('#fa'); fa.hidden = false;
             if (S.getSettings().autoSpeak) A.platform.speak(w.en, rate);
@@ -383,7 +403,7 @@
       }
 
       function judge(ok, w) {
-        if (!ok) misses++;
+        if (ok) { score += 10 + combo * 2; combo++; } else { misses++; combo = 0; }
         A.platform.speak(w.example, S.getSettings().speechRate);
         var last = step >= modes.length - 1;
         box.insertAdjacentHTML('beforeend',

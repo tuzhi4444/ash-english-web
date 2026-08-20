@@ -124,37 +124,70 @@
   }
 
   // ===== 语音识别：Web Speech API；不支持时由调用方降级为自评 =====
+  //
+  // 同时用 MediaRecorder 录一份音频，好让用户回放自己的发音——
+  // Web Speech API 只给文字不给音频，而"听自己说的"是跟读练习的关键一环。
+  // 两者共用麦克风，个别浏览器可能冲突，所以录音失败只是少个回放按钮，不影响识别。
   var SR = global.SpeechRecognition || global.webkitSpeechRecognition;
   var recog = null;
+  var mediaRec = null;
+  var lastUrl = null;
 
   function recognitionAvailable() { return !!SR; }
 
   function startRecognition(opts) {
     if (!SR) { opts.onError && opts.onError('当前浏览器不支持语音识别'); return; }
+    if (lastUrl) { try { URL.revokeObjectURL(lastUrl); } catch (e) {} lastUrl = null; }
+
+    // 录音（可选，失败不影响识别）
+    if (opts.onAudio && global.MediaRecorder && navigator.mediaDevices) {
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+        try {
+          var chunks = [];
+          mediaRec = new MediaRecorder(stream);
+          mediaRec.ondataavailable = function (e) { if (e.data.size) chunks.push(e.data); };
+          mediaRec.onstop = function () {
+            stream.getTracks().forEach(function (t) { t.stop(); });
+            if (chunks.length) {
+              lastUrl = URL.createObjectURL(new Blob(chunks, { type: chunks[0].type }));
+              opts.onAudio(lastUrl);
+            }
+          };
+          mediaRec.start();
+        } catch (e) { mediaRec = null; }
+      }).catch(function () { mediaRec = null; });
+    }
+
     try {
       recog = new SR();
       recog.lang = 'en-US';
       recog.interimResults = false;
       recog.maxAlternatives = 1;
       var got = '';
-      recog.onresult = function (e) {
-        got = e.results[0][0].transcript || '';
-      };
+      recog.onresult = function (e) { got = e.results[0][0].transcript || ''; };
       recog.onerror = function (e) {
+        stopMediaRec();
         opts.onError && opts.onError(e.error === 'not-allowed' ? '需要麦克风权限' : '识别失败');
       };
       recog.onend = function () {
-        opts.onRecordEnd && opts.onRecordEnd('');
+        stopMediaRec();
         opts.onStop && opts.onStop(got);
       };
       recog.start();
     } catch (e) {
+      stopMediaRec();
       opts.onError && opts.onError('无法启动识别');
     }
   }
 
+  function stopMediaRec() {
+    try { if (mediaRec && mediaRec.state !== 'inactive') mediaRec.stop(); } catch (e) {}
+    mediaRec = null;
+  }
+
   function stopRecognition() {
     try { if (recog) recog.stop(); } catch (e) {}
+    stopMediaRec();
   }
 
   global.AshPlatform = {

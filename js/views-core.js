@@ -232,11 +232,13 @@
   });
 
   // ========================= 单词学习 =========================
-  var STEP_NEW = ['flip', 'dictation', 'context', 'listening'];
-  var STEP_REVIEW = ['context', 'listening'];
-  var STEP_FREE = ['flip', 'dictation'];
+  // 步骤配置来自打包进来的 shared/utils/plan，与小程序端同一份定义
+  var STEP_NEW = Plan.WORD_STEPS.new;
+  var STEP_REVIEW = Plan.WORD_STEPS.review;
+  var STEP_FREE = Plan.WORD_STEPS.free;
   var LABELS = { flip: '翻卡', dictation: '听写', context: '语境', listening: '听辨' };
-  var MISS_NEW = 1, MISS_REVIEW = 0, RECHECK_GAP = 6, MAX_RECHECK = 2;
+  var MISS_NEW = Plan.WORD_MAX_MISSES.new, MISS_REVIEW = Plan.WORD_MAX_MISSES.review;
+  var RECHECK_GAP = 6, MAX_RECHECK = 2;
 
   A.register('words', {
     title: '单词学习',

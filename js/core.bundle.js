@@ -1,6 +1,6 @@
 /* 自动生成，请勿手改 —— 由 build.js 从小程序工程打包。
    源：english-app-mp
-   生成时间：2026-08-19T11:51:42.285Z
+   生成时间：2026-08-20T09:55:08.727Z
    共 23 个模块 */
 (function (global) {
   var defs = {}, cache = {};
@@ -4118,7 +4118,7 @@ function buildQueue(allWords, records, calendarDay, dailyNewLimit, maxReviewPerD
 __def("shared/utils/plan", function (module, exports, require) {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ASSESSMENT_SAMPLE_SIZE = exports.PHASE_NAMES = exports.PHASE_GATES = exports.RETAINED_STAGE = exports.OUTPUT_TARGETS = void 0;
+exports.WORD_MAX_MISSES = exports.WORD_STEPS = exports.ASSESSMENT_SAMPLE_SIZE = exports.PHASE_NAMES = exports.PHASE_GATES = exports.RETAINED_STAGE = exports.OUTPUT_TARGETS = void 0;
 exports.getDailyTarget = getDailyTarget;
 exports.todayStr = todayStr;
 exports.calculateCalendarDay = calculateCalendarDay;
@@ -4184,6 +4184,28 @@ exports.PHASE_GATES = {
  * 也要显示这个数——写死在两处的结果就是改了题量只改到一半。
  */
 exports.ASSESSMENT_SAMPLE_SIZE = 20;
+/**
+ * 单词模块每种情形要走哪几步。
+ *
+ * 放在 shared 而不是各自的页面里：小程序端和网页端都要用，写死在两边
+ * 就等于每改一次学习设计要同步两遍，迟早分叉——网页版的核心逻辑本来就是
+ * 从 shared 打包的，这里归进来才闭环。
+ *
+ * new    新词：完整四步。翻卡会把答案摆出来，后三步都是提取。
+ * review 复习：只做语境——在例句里填对词形。这一步同时考回忆和词形产出，
+ *        是四步里信息量最大的一个。实测 1902 个词有 1897 个能正常挖空，
+ *        剩下 5 个不规则动词找不到词形会直接放行（0.3%，可忽略）。
+ *        原先后面还跟一步听辨，但那是四选一的再认题，比语境容易得多，
+ *        放在语境之后基本不产生额外信息，只增加时间。
+ * free   自由复习：翻卡 + 听写，和 review 互补，一天内四种模式都碰得到。
+ */
+exports.WORD_STEPS = {
+    new: ['flip', 'dictation', 'context', 'listening'],
+    review: ['context'],
+    free: ['flip', 'dictation'],
+};
+/** 各情形允许错几次仍算通过。步骤越少越不该放宽，否则比例上比四步还松 */
+exports.WORD_MAX_MISSES = { new: 1, review: 0, free: 0 };
 exports.PHASE_NAMES = {
     1: '冷启动',
     2: '阻抗突围',

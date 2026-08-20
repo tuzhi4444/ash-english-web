@@ -57,11 +57,14 @@
         .filter(function (d) { return (st.stats.dailyStudyTime[d] || 0) > 0; }).length;
 
       var h = '<div class="card"><h3>近 7 天学习时长</h3><div class="chart">' +
-        last7.map(function (d) {
-          return '<div class="col"><div class="colbar" style="height:' +
+        last7.map(function (d, i) {
+          return '<div class="col' + (i === last7.length - 1 ? ' picked' : '') + '" data-i="' + i + '">' +
+            '<div class="colbar" style="height:' +
             Math.max(4, Math.round(d.seconds / maxSec * 120)) + 'px"></div>' +
             '<div class="hint">' + d.label + '</div></div>';
-        }).join('') + '</div></div>';
+        }).join('') + '</div>' +
+        '<div class="chart-detail" id="cd"></div>' +
+        '<p class="hint center">点柱子看那天的学习时长</p></div>';
 
       h += '<div class="card"><h3>学习进度</h3>' +
         kv('已通关', st.plan.cleared.length + ' 关') +
@@ -79,6 +82,26 @@
         kv('短文听力', Math.round(Stats.passageAccuracy(st) * 100) + '%') +
         kv('跟读最佳', st.shadowing.bestAccuracy + '%') + '</div>';
       return h;
+    },
+    mount: function (root) {
+      var st = S.getStore();
+      if (!st) return;
+      var last7 = Stats.last7Days(st.stats.dailyStudyTime);
+      var detail = root.querySelector('#cd');
+      if (!detail) return;
+      function show(i) {
+        var d = last7[i];
+        var p = String(d.date).split('-');
+        detail.innerHTML = '<span>周' + d.label + '　' + Number(p[1]) + '月' + Number(p[2]) + '日</span>' +
+          '<b>' + (d.seconds > 0 ? Stats.formatDuration(d.seconds) : '未学习') + '</b>';
+        root.querySelectorAll('.col').forEach(function (c, k) {
+          c.classList.toggle('picked', k === i);
+        });
+      }
+      root.querySelectorAll('.col').forEach(function (c) {
+        c.onclick = function () { show(+c.dataset.i); };
+      });
+      show(last7.length - 1);   // 默认显示今天
     }
   });
   function kv(k, v) { return '<div class="kv"><span>' + k + '</span><b>' + v + '</b></div>'; }

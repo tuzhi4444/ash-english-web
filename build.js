@@ -105,3 +105,15 @@ fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, header + '\n' + parts.join('\n') + '\n' + footer, 'utf8');
 const kb = (fs.statSync(OUT).size / 1024).toFixed(0);
 console.log(`已生成 ${path.relative(process.cwd(), OUT)}  (${ENTRIES.length} 个模块, ${kb}KB)`);
+
+// 给 index.html 里的 css/js 打上版本号。
+// 静态站点没有构建指纹，浏览器会按 Last-Modified 做启发式缓存——
+// 推了新版本用户却还在跑旧 JS，是这类部署最常见的坑。
+const IDX = path.join(__dirname, 'index.html');
+if (fs.existsSync(IDX)) {
+  const ver = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 12);
+  let html = fs.readFileSync(IDX, 'utf8');
+  html = html.replace(/(\b(?:src|href)="(?:js|css)\/[^"?]+)(\?v=[^"]*)?"/g, '$1?v=' + ver + '"');
+  fs.writeFileSync(IDX, html, 'utf8');
+  console.log(`index.html 资源版本号 → ?v=${ver}`);
+}

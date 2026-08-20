@@ -190,3 +190,11 @@ b{color:var(--primary)}
   background:rgba(0,0,0,.82);color:#fff;padding:10px 18px;border-radius:10px;font-size:14px;
   opacity:0;transition:.25s;pointer-events:none;max-width:80vw;text-align:center}
 .toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* 近 7 天图表：点柱子看明细 */
+.col{cursor:pointer}
+.col.picked .colbar{background:var(--warning)}
+.col.picked .hint{color:var(--primary);font-weight:600}
+.chart-detail{display:flex;justify-content:space-between;align-items:baseline;
+  margin-top:12px;padding:10px 14px;background:var(--bg-page);border-radius:12px}
+.chart-detail b{font-size:19px}

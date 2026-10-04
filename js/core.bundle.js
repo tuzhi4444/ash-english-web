@@ -1,6 +1,6 @@
 /* 自动生成，请勿手改 —— 由 build.js 从小程序工程打包。
    源：english-app-mp
-   生成时间：2026-08-23T08:35:52.546Z
+   生成时间：2026-10-04T16:39:57.114Z
    共 23 个模块 */
 (function (global) {
   var defs = {}, cache = {};
@@ -4140,22 +4140,13 @@ exports.resumeActiveLevel = resumeActiveLevel;
 exports.settleLevel = settleLevel;
 exports.completeTask = completeTask;
 const frameworks_1 = require("../data/frameworks");
-/**
- * 各阶段的输出类任务量（不含 words —— 单词量由当天队列决定，见 getDailyTarget）。
- *
- * 按"每天 1 小时"配平，每题耗时按 造句25s / 跟读30s / 听辨22s / 对话每轮23s / 单词10s 估算。
- *
- * 对话是后加的第五项，时间从 shadowing 里匀出来——两者都是"开口说"，
- * 而对话是回合制交际、比孤立单句跟读更接近真实场景，是更高价值的那个。
- * 匀完每阶段输出总时长反而略降：
- *   Phase 1 ≈ 15.6 分、Phase 2 ≈ 22.5 分、Phase 3 ≈ 26.5 分（另加单词稳态约 30 分）
- */
+/** 每日跟读、听辨各 50 句；旧任务字段保留为 0，兼容历史存档。 */
 exports.OUTPUT_TARGETS = {
-    '1': { framework: 8, shadowing: 14, listening: 8, dialogue: 6 },
-    '2': { framework: 12, shadowing: 20, listening: 12, dialogue: 8 },
-    '3': { framework: 15, shadowing: 24, listening: 12, dialogue: 10 },
+    '1': { framework: 0, shadowing: 50, listening: 50, dialogue: 0 },
+    '2': { framework: 0, shadowing: 50, listening: 50, dialogue: 0 },
+    '3': { framework: 0, shadowing: 50, listening: 50, dialogue: 0 },
     // 词库发完后不再有新词，省下的时间全部让给听说
-    maintenance: { framework: 10, shadowing: 28, listening: 12, dialogue: 10 },
+    maintenance: { framework: 0, shadowing: 50, listening: 50, dialogue: 0 },
 };
 /**
  * "巩固"的门槛：stage 3 意味着这个词连续答对 3 次、间隔走到 1→3→7 天，
@@ -4328,21 +4319,19 @@ function getUnlockedFrameworks(phase) {
 }
 /** 空的关卡完成记录 */
 function emptyCompletion() {
-    return { words: 0, framework: 0, shadowing: 0, listening: 0, dialogue: 0 };
+    return { words: 0, framework: 0, shadowing: 50, listening: 50, dialogue: 0 };
 }
 /** 某一项是否达标（目标为 0 表示本阶段不需要做） */
 function isTaskDone(done, target) {
     return target === 0 || done >= target;
 }
-/** 某关五项任务是否都做满了目标量 */
+/** 某关三项任务是否都做满了目标量 */
 function isLevelComplete(completion, target) {
     if (!completion)
         return false;
     return (isTaskDone(completion.words, target.words) &&
-        isTaskDone(completion.framework, target.framework) &&
         isTaskDone(completion.shadowing, target.shadowing) &&
-        isTaskDone(completion.listening, target.listening) &&
-        isTaskDone(completion.dialogue, target.dialogue));
+        isTaskDone(completion.listening, target.listening));
 }
 /** 今天是否已经通过一关（一天只能通一关，防止猛刷压垮 SRS） */
 function hasClearedToday(plan) {

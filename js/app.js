@@ -64,7 +64,7 @@
   // 而手机上切走 App 时 visibilitychange/pagehide 未必可靠，
   // 时间戳会停在几小时前，某次路由切换就把这一大段记进去，
   // 于是出现单日 26 小时这种不可能的数。
-  var TIMED = { words: 1, framework: 1, shadowing: 1, listening: 1, dialogue: 1, passage_detail: 1 };
+  var TIMED = { words: 1, shadowing: 1, listening: 1, passage_detail: 1 };
   function startTiming(name) { if (TIMED[name]) Store.startStudyTimer(); }
   function flushStudyTime() { Store.stopStudyTimer(); }
 

@@ -95,7 +95,6 @@
         kv('总时长', Stats.formatDuration(st.stats.totalStudyTime)) + '</div>';
 
       h += '<div class="card"><h3>练习正确率</h3>' +
-        kv('框架造句', Math.round(Stats.frameworkAccuracy(st) * 100) + '%') +
         kv('听辨训练', Math.round(Stats.listeningAccuracy(st) * 100) + '%') +
         kv('短文听力', Math.round(Stats.passageAccuracy(st) * 100) + '%') +
         kv('跟读最佳', st.shadowing.bestAccuracy + '%') + '</div>';

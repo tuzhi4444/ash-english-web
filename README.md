@@ -72,3 +72,7 @@ build.js              从小程序工程打包核心逻辑
 iOS Safari / Android Chrome / 桌面 Chrome、Edge、Safari。
 
 语音识别依赖 Web Speech API，目前 Chrome 系支持最好；iOS Safari 上跟读会自动降级为自评模式，其余功能不受影响。
+
+## 2026-10-04 学习任务调整
+
+框架造句和对话场景已移除。每日任务为单词学习、跟读 50 句、听辨 50 句，所有阶段及维持模式一致。旧存档与已通关记录保留。

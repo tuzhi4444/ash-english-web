@@ -18,7 +18,7 @@
         return '<div class="card welcome">' +
           '<div class="big-icon">📚</div>' +
           '<h1>Ash英语</h1>' +
-          '<p>一个系统化的英语学习工具，包含 1900+ 词汇、36 种句式框架、听力训练、对话场景和间隔复习算法。</p>' +
+          '<p>一个系统化的英语学习工具，包含 1900+ 词汇、跟读训练、听辨训练、短文听力和间隔复习算法。</p>' +
           '<p>词库按口语使用频率排序，学习也严格按这个顺序走。入门测试沿这条序列抽 ' +
           Plan.ASSESSMENT_SAMPLE_SIZE + ' 个词，找出<b>你大概该从第几个词开始学</b>。</p>' +
           '<p>测不准也没关系——之后会看你在新词上的真实表现自动调整起点，几天内就会修到位。' +
@@ -42,10 +42,8 @@
 
       var tasks = [
         ['words', '📗', '单词学习', c.words, t.words],
-        ['framework', '✏️', '框架造句', c.framework, t.framework],
         ['shadowing', '🎤', '跟读训练', c.shadowing, t.shadowing],
-        ['listening', '🎧', '听辨训练', c.listening, t.listening],
-        ['dialogue', '💬', '对话场景', c.dialogue, t.dialogue]
+        ['listening', '🎧', '听辨训练', c.listening, t.listening]
       ];
 
       var h = '<div class="card phase">' +
@@ -90,11 +88,6 @@
         '<a class="row" href="#/passage"><span class="row-icon">📖</span>' +
         '<span class="row-main"><span class="row-title">短文听力</span></span>' +
         '<span class="hint">' + st.passage.completed.length + '/' + ps.length + '</span><span class="arrow">›</span></a>' +
-        '<a class="row" href="#/dialogue_list"><span class="row-icon">💬</span>' +
-        '<span class="row-main"><span class="row-title">对话场景库</span></span>' +
-        '<span class="hint">' + (st.dialogue.practiced || []).length + '/' +
-        core('shared/data/dialogues/index').getUnlockedDialogues(st.plan.currentPhase).length +
-        '</span><span class="arrow">›</span></a>' +
         '<a class="row" href="#/browser"><span class="row-icon">🔍</span>' +
         '<span class="row-main"><span class="row-title">词库浏览</span></span><span class="arrow">›</span></a>' +
         '</div>';

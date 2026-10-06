@@ -1,6 +1,6 @@
 /* 自动生成，请勿手改 —— 由 build.js 从小程序工程打包。
    源：english-app-mp
-   生成时间：2026-10-04T16:39:57.114Z
+   生成时间：2026-10-06T19:29:45.200Z
    共 23 个模块 */
 (function (global) {
   var defs = {}, cache = {};
@@ -4319,7 +4319,7 @@ function getUnlockedFrameworks(phase) {
 }
 /** 空的关卡完成记录 */
 function emptyCompletion() {
-    return { words: 0, framework: 0, shadowing: 50, listening: 50, dialogue: 0 };
+    return { words: 0, framework: 0, shadowing: 0, listening: 0, dialogue: 0 };
 }
 /** 某一项是否达标（目标为 0 表示本阶段不需要做） */
 function isTaskDone(done, target) {
